@@ -51,11 +51,38 @@ static CURLcode imap_list_uids(const char *host, int port, const char *user, con
     return res;
 }
 
+/* Fetches a single message by UID into buf. Caller must free buf->data. */
+static CURLcode imap_fetch_message(const char *host, int port, const char *user, const char *pass,
+                                   const char *mailbox, int uid, Buffer *buf) {
+    char url[512];
+    snprintf(url, sizeof(url), "imap://%s:%d/%s/;UID=%d", host, port, mailbox, uid);
+
+    CURL *curl = curl_easy_init();
+    if (!curl) return CURLE_FAILED_INIT;
+
+    curl_easy_setopt(curl, CURLOPT_URL, url);
+    curl_easy_setopt(curl, CURLOPT_USERNAME, user);
+    curl_easy_setopt(curl, CURLOPT_PASSWORD, pass);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, buf);
+
+    CURLcode res = curl_easy_perform(curl);
+    if (res != CURLE_OK)
+        fprintf(stderr, "imap_fetch_message UID=%d: %s\n", uid, curl_easy_strerror(res));
+
+    curl_easy_cleanup(curl);
+    return res;
+}
+
 int main(void) {
     CURLcode res = curl_global_init(CURL_GLOBAL_DEFAULT);
     if (res != CURLE_OK) return 1;
 
-    res = imap_list_uids("localhost", 1143, "test", "password", "INBOX");
+    Buffer msg = {0};
+    res = imap_fetch_message("localhost", 1143, "test", "password", "INBOX", 1, &msg);
+    if (res == CURLE_OK)
+        printf("%s\n", msg.data);
+    free(msg.data);
 
     curl_global_cleanup();
     return (int)res;
