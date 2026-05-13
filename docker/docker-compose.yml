@@ -1,0 +1,24 @@
+services:
+  source-imap:
+    image: greenmail/standalone:2.1.3
+    platform: linux/arm64
+    ports:
+      - "1143:3143"
+    environment:
+      GREENMAIL_OPTS: >-
+        -Dgreenmail.setup.test.imap
+        -Dgreenmail.hostname=0.0.0.0
+        -Dgreenmail.auth.disabled
+        -Dgreenmail.users=test:password
+
+  dest-imap:
+    image: greenmail/standalone:2.1.3
+    platform: linux/arm64
+    ports:
+      - "2143:3143"
+    environment:
+      GREENMAIL_OPTS: >-
+        -Dgreenmail.setup.test.imap
+        -Dgreenmail.hostname=0.0.0.0
+        -Dgreenmail.auth.disabled
+        -Dgreenmail.users=test:password
