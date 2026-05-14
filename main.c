@@ -135,41 +135,137 @@ static CURLcode transfer_mailbox(struct ImapServer src, struct ImapServer dst) {
     return res;
 }
 
-static void run_tui(struct ImapServer src, struct ImapServer dst) {
+static CURLcode imap_fetch_envelopes(struct ImapServer srv, struct Buffer *buf) {
+    char url[512];
+    snprintf(url, sizeof(url), "imap://%s:%d/%s", srv.host, srv.port, srv.mailbox);
+
+    CURL *curl = curl_easy_init();
+    if (!curl) return CURLE_FAILED_INIT;
+
+    curl_easy_setopt(curl, CURLOPT_URL, url);
+    curl_easy_setopt(curl, CURLOPT_USERNAME, srv.user);
+    curl_easy_setopt(curl, CURLOPT_PASSWORD, srv.pass);
+    curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "UID FETCH 1:* (ENVELOPE)");
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, buf);
+
+    CURLcode res = curl_easy_perform(curl);
+    if (res != CURLE_OK)
+        fprintf(stderr, "imap_fetch_envelopes: %s\n", curl_easy_strerror(res));
+
+    curl_easy_cleanup(curl);
+    return res;
+}
+
+static void extract_envelope_mid(const char *line, char *out, size_t outlen) {
+    const char *end = strstr(line, ") UID");
+    if (!end) { out[0] = '\0'; return; }
+
+    const char *close = end - 1;
+    while (close > line && *close != '"') close--;
+    if (*close != '"') { out[0] = '\0'; return; }
+
+    const char *open = close - 1;
+    while (open > line && *open != '"') open--;
+    if (*open != '"') { out[0] = '\0'; return; }
+
+    size_t len = (size_t)(close - open - 1);
+    if (len >= outlen) len = outlen - 1;
+    memcpy(out, open + 1, len);
+    out[len] = '\0';
+}
+
+static CURLcode validate_transfer(struct ImapServer src, struct ImapServer dst, WINDOW *win) {
+    struct Buffer src_buf = {0}, dst_buf = {0};
+
+    CURLcode res = imap_fetch_envelopes(src, &src_buf);
+    if (res != CURLE_OK) {
+        free(src_buf.data);
+        free(dst_buf.data);
+        return res;
+    }
+
+    res = imap_fetch_envelopes(dst, &dst_buf);
+    if (res != CURLE_OK) {
+        free(src_buf.data);
+        free(dst_buf.data);
+        return res;
+    }
+
+    clear();
+    int row = 2, missing = 0;
+    char *line = src_buf.data ? strtok(src_buf.data, "\n") : NULL;
+    while (line) {
+        if (strstr(line, "FETCH (ENVELOPE")) {
+            char mid[256];
+            extract_envelope_mid(line, mid, sizeof(mid));
+            if (*mid && (!dst_buf.data || !strstr(dst_buf.data, mid))) {
+                mvwprintw(win, row++, 2, "MISSING: %s", mid);
+                missing++;
+            }
+        }
+        line = strtok(NULL, "\n");
+    }
+
+    if (missing == 0)
+        mvwprintw(win, row, 2, "All messages present on destination.");
+
+    free(src_buf.data);
+    free(dst_buf.data);
+    return CURLE_OK;
+}
+
+static void ncurses_init(void) {
     initscr();
     cbreak();
     noecho();
     keypad(stdscr, TRUE);
     curs_set(0);
+}
 
-    const char *menu[] = {"Transfer all"};
+static void run_action(struct ImapServer src, struct ImapServer dst, int action) {
+    curl_global_init(CURL_GLOBAL_DEFAULT);
+
+    clear();
+    if (action == 0) {
+        mvprintw(2, 2, "Transferring...");
+        refresh();
+        CURLcode res = transfer_mailbox(src, dst);
+        clear();
+        mvprintw(2, 2, res == CURLE_OK ? "Done. Press any key." : "Error. Press any key.");
+    } else {
+        mvprintw(2, 2, "Validating...");
+        refresh();
+        validate_transfer(src, dst, stdscr);
+        mvprintw(LINES - 1, 0, "Press any key.");
+    }
+
+    curl_global_cleanup();
+    refresh();
+    getch();
+}
+
+static void run_tui(struct ImapServer src, struct ImapServer dst) {
+    ncurses_init();
+
+    const char *menu[] = {"Transfer all", "Validate transfer"};
+    int nitems = 2;
     int selected = 0;
 
     int ch;
     while (1) {
         clear();
-        mvprintw(0, 0, "IMAP Mail Transfer  [Enter] Run  [q] Quit");
-        mvprintw(2, 2, "%s %s", selected == 0 ? ">" : " ", menu[0]);
+        mvprintw(LINES - 1, 0, "IMAP Mail Transfer  [up/down] Navigate  [Enter] Run  [q] Quit");
+        for (int i = 0; i < nitems; i++)
+            mvprintw(2 + i, 2, "%s %s", i == selected ? ">" : " ", menu[i]);
         refresh();
 
         ch = getch();
         if (ch == 'q') break;
-        if (ch == '\n' || ch == KEY_ENTER) {
-            endwin();
-            curl_global_init(CURL_GLOBAL_DEFAULT);
-            CURLcode res = transfer_mailbox(src, dst);
-            curl_global_cleanup();
-            initscr();
-            cbreak();
-            noecho();
-            keypad(stdscr, TRUE);
-            curs_set(0);
-            clear();
-            mvprintw(0, 0, res == CURLE_OK ? "Done. Press any key." : "Error. Press any key.");
-            refresh();
-            getch();
-            break;
-        }
+        if (ch == KEY_UP && selected > 0) selected--;
+        if (ch == KEY_DOWN && selected < nitems - 1) selected++;
+        if (ch == '\n' || ch == KEY_ENTER)
+            run_action(src, dst, selected);
     }
 
     endwin();

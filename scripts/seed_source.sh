@@ -11,8 +11,9 @@ TMP=$(mktemp)
 send_mail() {
     local subject="$1"
     local body="$2"
-    printf "From: sender@example.com\r\nTo: test@example.com\r\nSubject: %s\r\nDate: %s\r\n\r\n%s\r\n" \
-        "$subject" "$(date -R)" "$body" > "$TMP"
+    local mid="<$(date +%s%N).$$@example.com>"
+    printf "From: sender@example.com\r\nTo: test@example.com\r\nSubject: %s\r\nDate: %s\r\nMessage-ID: %s\r\n\r\n%s\r\n" \
+        "$subject" "$(date -R)" "$mid" "$body" > "$TMP"
     curl -s \
         --url "imap://$HOST:$PORT/INBOX" \
         --user "$USER:$PASS" \
