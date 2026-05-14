@@ -41,11 +41,10 @@ static size_t read_callback(char *ptr, size_t size, size_t nmemb, void *userdata
     return to_copy;
 }
 
-static CURLcode imap_list_uids(struct ImapServer srv) {
+static CURLcode imap_list_uids(struct ImapServer srv, struct Buffer *buf) {
     char url[512];
     snprintf(url, sizeof(url), "imap://%s:%d/%s", srv.host, srv.port, srv.mailbox);
 
-    struct Buffer buf = {0};
     CURL *curl = curl_easy_init();
     if (!curl) return CURLE_FAILED_INIT;
 
@@ -54,16 +53,13 @@ static CURLcode imap_list_uids(struct ImapServer srv) {
     curl_easy_setopt(curl, CURLOPT_PASSWORD, srv.pass);
     curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "UID SEARCH ALL");
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &buf);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, buf);
 
     CURLcode res = curl_easy_perform(curl);
     if (res != CURLE_OK)
         fprintf(stderr, "imap_list_uids: %s\n", curl_easy_strerror(res));
-    else
-        printf("%s\n", buf.data ? buf.data : "");
 
     curl_easy_cleanup(curl);
-    free(buf.data);
     return res;
 }
 
@@ -111,6 +107,33 @@ static CURLcode imap_append_message(struct ImapServer dst, struct Buffer msg) {
     return res;
 }
 
+static CURLcode transfer_mailbox(struct ImapServer src, struct ImapServer dst) {
+    struct Buffer uid_buf = {0};
+    CURLcode res = imap_list_uids(src, &uid_buf);
+    if (res != CURLE_OK) return res;
+
+    char *p = strstr(uid_buf.data, "SEARCH");
+    if (!p) { free(uid_buf.data); return CURLE_OK; }
+    p += strlen("SEARCH");
+
+    while (*p) {
+        char *end;
+        long uid = strtol(p, &end, 10);
+        if (end == p) break;
+        p = end;
+
+        struct Buffer msg = {0};
+        res = imap_fetch_message(src, (int)uid, &msg);
+        if (res == CURLE_OK)
+            res = imap_append_message(dst, msg);
+        free(msg.data);
+        if (res != CURLE_OK) break;
+    }
+
+    free(uid_buf.data);
+    return res;
+}
+
 int main(void) {
     CURLcode res = curl_global_init(CURL_GLOBAL_DEFAULT);
     if (res != CURLE_OK) return 1;
@@ -118,11 +141,7 @@ int main(void) {
     struct ImapServer src = {"localhost", 1143, "test", "password", "INBOX"};
     struct ImapServer dst = {"localhost", 2143, "test", "password", "INBOX"};
 
-    struct Buffer msg = {0};
-    res = imap_fetch_message(src, 1, &msg);
-    if (res == CURLE_OK)
-        res = imap_append_message(dst, msg);
-    free(msg.data);
+    res = transfer_mailbox(src, dst);
 
     curl_global_cleanup();
     return (int)res;
