@@ -32,6 +32,15 @@ static size_t write_callback(char *ptr, size_t size, size_t nmemb, void *userdat
     return realsize;
 }
 
+static size_t read_callback(char *ptr, size_t size, size_t nmemb, void *userdata) {
+    struct Buffer *buf = (struct Buffer *)userdata;
+    size_t to_copy = buf->size < size * nmemb ? buf->size : size * nmemb;
+    memcpy(ptr, buf->data, to_copy);
+    buf->data += to_copy;
+    buf->size -= to_copy;
+    return to_copy;
+}
+
 static CURLcode imap_list_uids(struct ImapServer srv) {
     char url[512];
     snprintf(url, sizeof(url), "imap://%s:%d/%s", srv.host, srv.port, srv.mailbox);
@@ -79,16 +88,40 @@ static CURLcode imap_fetch_message(struct ImapServer srv, int uid, struct Buffer
     return res;
 }
 
+static CURLcode imap_append_message(struct ImapServer dst, struct Buffer msg) {
+    char url[512];
+    snprintf(url, sizeof(url), "imap://%s:%d/%s", dst.host, dst.port, dst.mailbox);
+
+    CURL *curl = curl_easy_init();
+    if (!curl) return CURLE_FAILED_INIT;
+
+    curl_easy_setopt(curl, CURLOPT_URL, url);
+    curl_easy_setopt(curl, CURLOPT_USERNAME, dst.user);
+    curl_easy_setopt(curl, CURLOPT_PASSWORD, dst.pass);
+    curl_easy_setopt(curl, CURLOPT_UPLOAD, 1L);
+    curl_easy_setopt(curl, CURLOPT_READFUNCTION, read_callback);
+    curl_easy_setopt(curl, CURLOPT_READDATA, &msg);
+    curl_easy_setopt(curl, CURLOPT_INFILESIZE_LARGE, (curl_off_t)msg.size);
+
+    CURLcode res = curl_easy_perform(curl);
+    if (res != CURLE_OK)
+        fprintf(stderr, "imap_append_message: %s\n", curl_easy_strerror(res));
+
+    curl_easy_cleanup(curl);
+    return res;
+}
+
 int main(void) {
     CURLcode res = curl_global_init(CURL_GLOBAL_DEFAULT);
     if (res != CURLE_OK) return 1;
 
     struct ImapServer src = {"localhost", 1143, "test", "password", "INBOX"};
+    struct ImapServer dst = {"localhost", 2143, "test", "password", "INBOX"};
 
     struct Buffer msg = {0};
     res = imap_fetch_message(src, 1, &msg);
     if (res == CURLE_OK)
-        printf("%s\n", msg.data);
+        res = imap_append_message(dst, msg);
     free(msg.data);
 
     curl_global_cleanup();
