@@ -16,11 +16,12 @@ Copies all emails from one IMAP mailbox to another using libcurl.
 - C compiler (gcc or clang)
 - CMake 3.28+
 - libcurl with IMAP support
+- ncurses
 
 ### Install on Debian/Ubuntu
 
 ```bash
-sudo apt install cmake gcc libcurl4-openssl-dev
+sudo apt install cmake gcc libcurl4-openssl-dev libncurses-dev
 ```
 
 ## Build
