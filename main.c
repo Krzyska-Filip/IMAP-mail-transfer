@@ -134,12 +134,18 @@ static CURLcode transfer_mailbox(struct ImapServer src, struct ImapServer dst) {
     return res;
 }
 
-int main(void) {
+int main(int argc, char *argv[]) {
+    if (argc != 10) {
+        fprintf(stderr, "Usage: %s <src_host> <src_port> <src_user> <src_pass>"
+                        " <dst_host> <dst_port> <dst_user> <dst_pass> <mailbox>\n", argv[0]);
+        return 1;
+    }
+
+    struct ImapServer src = {argv[1], atoi(argv[2]), argv[3], argv[4], argv[9]};
+    struct ImapServer dst = {argv[5], atoi(argv[6]), argv[7], argv[8], argv[9]};
+
     CURLcode res = curl_global_init(CURL_GLOBAL_DEFAULT);
     if (res != CURLE_OK) return 1;
-
-    struct ImapServer src = {"localhost", 1143, "test", "password", "INBOX"};
-    struct ImapServer dst = {"localhost", 2143, "test", "password", "INBOX"};
 
     res = transfer_mailbox(src, dst);
 
