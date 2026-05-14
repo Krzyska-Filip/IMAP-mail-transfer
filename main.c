@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <curl/curl.h>
+#include <ncurses.h>
 
 struct ImapServer {
     const char *host;
@@ -134,6 +135,46 @@ static CURLcode transfer_mailbox(struct ImapServer src, struct ImapServer dst) {
     return res;
 }
 
+static void run_tui(struct ImapServer src, struct ImapServer dst) {
+    initscr();
+    cbreak();
+    noecho();
+    keypad(stdscr, TRUE);
+    curs_set(0);
+
+    const char *menu[] = {"Transfer all"};
+    int selected = 0;
+
+    int ch;
+    while (1) {
+        clear();
+        mvprintw(0, 0, "IMAP Mail Transfer  [Enter] Run  [q] Quit");
+        mvprintw(2, 2, "%s %s", selected == 0 ? ">" : " ", menu[0]);
+        refresh();
+
+        ch = getch();
+        if (ch == 'q') break;
+        if (ch == '\n' || ch == KEY_ENTER) {
+            endwin();
+            curl_global_init(CURL_GLOBAL_DEFAULT);
+            CURLcode res = transfer_mailbox(src, dst);
+            curl_global_cleanup();
+            initscr();
+            cbreak();
+            noecho();
+            keypad(stdscr, TRUE);
+            curs_set(0);
+            clear();
+            mvprintw(0, 0, res == CURLE_OK ? "Done. Press any key." : "Error. Press any key.");
+            refresh();
+            getch();
+            break;
+        }
+    }
+
+    endwin();
+}
+
 int main(int argc, char *argv[]) {
     if (argc != 10) {
         fprintf(stderr, "Usage: %s <src_host> <src_port> <src_user> <src_pass>"
@@ -144,11 +185,6 @@ int main(int argc, char *argv[]) {
     struct ImapServer src = {argv[1], atoi(argv[2]), argv[3], argv[4], argv[9]};
     struct ImapServer dst = {argv[5], atoi(argv[6]), argv[7], argv[8], argv[9]};
 
-    CURLcode res = curl_global_init(CURL_GLOBAL_DEFAULT);
-    if (res != CURLE_OK) return 1;
-
-    res = transfer_mailbox(src, dst);
-
-    curl_global_cleanup();
-    return (int)res;
+    run_tui(src, dst);
+    return 0;
 }
