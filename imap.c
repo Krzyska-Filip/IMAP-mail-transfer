@@ -29,6 +29,10 @@ static size_t read_callback(char *ptr, size_t size, size_t nmemb, void *userdata
     return to_copy;
 }
 
+static size_t discard_callback(char *, size_t, size_t nmemb, void *) {
+    return nmemb;
+}
+
 static CURLcode imap_execute(struct ImapServer srv, struct ImapRequest req, const char *label) {
     char url[512];
     if (req.uid > 0)
@@ -41,18 +45,26 @@ static CURLcode imap_execute(struct ImapServer srv, struct ImapRequest req, cons
     curl_easy_setopt(curl, CURLOPT_URL, url);
     curl_easy_setopt(curl, CURLOPT_USERNAME, srv.user);
     curl_easy_setopt(curl, CURLOPT_PASSWORD, srv.pass);
+
     if (req.out) {
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, req.out);
     }
+    else {
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, discard_callback);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, NULL);
+    }
+
     if (req.upload) {
         curl_easy_setopt(curl, CURLOPT_UPLOAD, 1L);
         curl_easy_setopt(curl, CURLOPT_READFUNCTION, read_callback);
         curl_easy_setopt(curl, CURLOPT_READDATA, req.upload);
         curl_easy_setopt(curl, CURLOPT_INFILESIZE_LARGE, (curl_off_t)req.upload->size);
     }
-    if (req.custom_request)
+
+    if (req.custom_request) {
         curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, req.custom_request);
+    }
 
     CURLcode res = curl_easy_perform(curl);
     if (res != CURLE_OK)

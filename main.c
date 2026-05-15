@@ -1,9 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include <ncurses.h>
 
 #include "imap.h"
+#include "init.h"
 
 static CURLcode transfer_mailbox(struct ImapServer src, struct ImapServer dst) {
     struct Buffer uid_buf = {0};
@@ -67,7 +69,7 @@ static CURLcode validate_transfer(struct ImapServer src, struct ImapServer dst, 
         return res;
     }
 
-    clear();
+    if (win) clear();
     int row = 2, missing = 0;
     char *line = src_buf.data ? strtok(src_buf.data, "\n") : NULL;
     while (line) {
@@ -75,15 +77,18 @@ static CURLcode validate_transfer(struct ImapServer src, struct ImapServer dst, 
             char mid[256];
             extract_envelope_mid(line, mid, sizeof(mid));
             if (*mid && (!dst_buf.data || !strstr(dst_buf.data, mid))) {
-                mvwprintw(win, row++, 2, "MISSING: %s", mid);
+                if (win) mvwprintw(win, row++, 2, "MISSING: %s", mid);
+                else printf("MISSING: %s\n", mid);
                 missing++;
             }
         }
         line = strtok(NULL, "\n");
     }
 
-    if (missing == 0)
-        mvwprintw(win, row, 2, "All messages present on destination.");
+    if (missing == 0) {
+        if (win) mvwprintw(win, row, 2, "All messages present on destination.");
+        else printf("All messages present on destination.\n");
+    }
 
     free(src_buf.data);
     free(dst_buf.data);
@@ -99,8 +104,6 @@ static void ncurses_init(void) {
 }
 
 static void run_action(struct ImapServer src, struct ImapServer dst, int action) {
-    curl_global_init(CURL_GLOBAL_DEFAULT);
-
     clear();
     if (action == 0) {
         mvprintw(2, 2, "Transferring...");
@@ -115,7 +118,6 @@ static void run_action(struct ImapServer src, struct ImapServer dst, int action)
         mvprintw(LINES - 1, 0, "Press any key.");
     }
 
-    curl_global_cleanup();
     refresh();
     getch();
 }
@@ -146,16 +148,60 @@ static void run_tui(struct ImapServer src, struct ImapServer dst) {
     endwin();
 }
 
+static void run_cli(struct ImapServer src, struct ImapServer dst, const char *action) {
+    if (strcmp(action, "transfer") == 0) {
+        printf("Transferring...\n");
+        CURLcode res = transfer_mailbox(src, dst);
+        printf(res == CURLE_OK ? "Done.\n" : "Error.\n");
+    } else if (strcmp(action, "validate") == 0) {
+        printf("Validating...\n");
+        validate_transfer(src, dst, NULL);
+    } else {
+        fprintf(stderr, "Unknown action: %s\n", action);
+    }
+}
+
+
 int main(int argc, char *argv[]) {
-    if (argc != 10) {
-        fprintf(stderr, "Usage: %s <src_host> <src_port> <src_user> <src_pass>"
-                        " <dst_host> <dst_port> <dst_user> <dst_pass> <mailbox>\n", argv[0]);
+    struct ImapServer src, dst;
+    struct ParsedOpts opts;
+
+    if (parse_opts(argc, argv, &opts) != 0) {
         return 1;
     }
 
-    struct ImapServer src = {argv[1], atoi(argv[2]), argv[3], argv[4], argv[9]};
-    struct ImapServer dst = {argv[5], atoi(argv[6]), argv[7], argv[8], argv[9]};
+    const char* src_addr = argv[optind];
+    const char* dst_addr = argv[optind + 1];
 
-    run_tui(src, dst);
+    src.mailbox = argv[optind + 2];
+    dst.mailbox = argv[optind + 2];
+
+    src.pass = opts.src_pass[0] ? opts.src_pass : NULL;
+    dst.pass = opts.dst_pass[0] ? opts.dst_pass : NULL;
+
+    if (parse_addr(src_addr, &src) != 0) {
+        fprintf(stderr, "Invalid source address (expected user@host:port)\n");
+        return 1;
+    }
+
+    if (parse_addr(dst_addr, &dst) != 0) {
+        fprintf(stderr, "Invalid destination address (expected user@host:port)\n");
+        return 1;
+    }
+
+    curl_global_init(CURL_GLOBAL_DEFAULT);
+
+    if (authenticate(&src, opts.src_pass, sizeof(opts.src_pass)) != 0 ||
+        authenticate(&dst, opts.dst_pass, sizeof(opts.dst_pass)) != 0) {
+        curl_global_cleanup();
+        return 1;
+    }
+
+    if (opts.action)
+        run_cli(src, dst, opts.action);
+    else
+        run_tui(src, dst);
+
+    curl_global_cleanup();
     return 0;
 }
