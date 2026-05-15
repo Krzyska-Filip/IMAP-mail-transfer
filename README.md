@@ -6,10 +6,26 @@ Copies all emails from one IMAP mailbox to another using libcurl.
 
 | File | Description |
 |------|-------------|
-| `main.c` | All program logic |
+| `main.c` | TUI, CLI, and transfer logic |
+| `src/imap.c` | libcurl IMAP operations |
+| `src/init.c` | Argument parsing and authentication |
 | `CMakeLists.txt` | Build configuration |
 | `docker/docker-compose.yml` | Two GreenMail IMAP servers for testing |
 | `scripts/seed_source.sh` | Seeds the source server with test emails |
+
+## Usage
+
+```bash
+# Interactive TUI
+./build/imap_mail_transfer user@src-host:port user@dst-host:port INBOX
+
+# CLI — run action directly
+./build/imap_mail_transfer -o transfer user@src-host:port user@dst-host:port INBOX
+./build/imap_mail_transfer -o validate user@src-host:port user@dst-host:port INBOX
+
+# With passwords as flags (otherwise prompted interactively)
+./build/imap_mail_transfer user@src-host:port -p src_pass user@dst-host:port -P dst_pass INBOX -o transfer
+```
 
 ## Requirements
 
