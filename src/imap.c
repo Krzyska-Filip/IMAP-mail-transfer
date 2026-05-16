@@ -99,3 +99,12 @@ CURLcode imap_fetch_envelopes(struct ImapServer srv, struct Buffer *buf) {
     req.out = buf;
     return imap_execute(srv, req, "imap_fetch_envelopes");
 }
+
+CURLcode imap_delete_all(struct ImapServer srv) {
+    struct ImapRequest req = {0};
+    req.custom_request = "UID STORE 1:* +FLAGS (\\Deleted)";
+    CURLcode res = imap_execute(srv, req, "imap_delete_all");
+    if (res != CURLE_OK) return res;
+    req.custom_request = "EXPUNGE";
+    return imap_execute(srv, req, "imap_delete_all");
+}

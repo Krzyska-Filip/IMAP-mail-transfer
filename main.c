@@ -111,11 +111,64 @@ static void run_action(struct ImapServer src, struct ImapServer dst, int action)
         CURLcode res = transfer_mailbox(src, dst);
         clear();
         mvprintw(2, 2, res == CURLE_OK ? "Done. Press any key." : "Error. Press any key.");
-    } else {
+    } else if (action == 1) {
         mvprintw(2, 2, "Validating...");
         refresh();
         validate_transfer(src, dst, stdscr);
         mvprintw(LINES - 1, 0, "Press any key.");
+    } else {
+        const char *targets[] = {
+            "Source",
+            "Destination",
+        };
+        const struct ImapServer *servers[] = { &src, &dst };
+        int sel = 0, ch;
+
+        while (1) {
+            clear();
+            mvprintw(0, 2, "Clear mailbox");
+            mvprintw(LINES - 1, 0, "Clear mailbox  [up/down] Navigate  [Enter] Select  [q] Cancel");
+            for (int i = 0; i < 2; i++)
+                mvprintw(2 + i, 2, "%s %s  %s@%s/%s",
+                         i == sel ? ">" : " ", targets[i],
+                         servers[i]->user, servers[i]->host, servers[i]->mailbox);
+            refresh();
+
+            ch = getch();
+            if (ch == 'q') return;
+            if (ch == KEY_UP && sel > 0) sel--;
+            if (ch == KEY_DOWN && sel < 1) sel++;
+            if (ch == '\n' || ch == KEY_ENTER) break;
+        }
+
+        struct ImapServer target = *servers[sel];
+
+        clear();
+        mvprintw(0, 2, "Clear mailbox");
+        mvprintw(2, 2, "Clear %s@%s/%s?", target.user, target.host, target.mailbox);
+        mvprintw(4, 2, "Type 'confirm' to proceed: ");
+        mvprintw(LINES - 1, 0, "Clear mailbox  [confirm] Execute  [q/Enter] Cancel");
+        refresh();
+
+        echo();
+        curs_set(1);
+        char input[16];
+        mvgetnstr(4, 29, input, (int)sizeof(input) - 1);
+        noecho();
+        curs_set(0);
+
+        if (strcmp(input, "confirm") != 0) {
+            mvprintw(6, 2, "Cancelled. Press any key.");
+            refresh();
+            getch();
+            return;
+        }
+
+        mvprintw(6, 2, "Clearing...");
+        refresh();
+        CURLcode res = imap_delete_all(target);
+        clear();
+        mvprintw(2, 2, res == CURLE_OK ? "Done. Press any key." : "Error. Press any key.");
     }
 
     refresh();
@@ -125,8 +178,8 @@ static void run_action(struct ImapServer src, struct ImapServer dst, int action)
 static void run_tui(struct ImapServer src, struct ImapServer dst) {
     ncurses_init();
 
-    const char *menu[] = {"Transfer all", "Validate transfer"};
-    int nitems = 2;
+    const char *menu[] = {"Transfer all", "Validate transfer", "Clear mailbox"};
+    int nitems = 3;
     int selected = 0;
 
     int ch;
