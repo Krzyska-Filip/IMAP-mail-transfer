@@ -87,7 +87,10 @@ static void run_action(struct ImapServer src, struct ImapServer dst, int action)
         refresh();
         CURLcode res = transfer_mailbox(src, dst);
         clear();
-        mvprintw(2, 2, res == CURLE_OK ? "Done. Press any key." : "Error. Press any key.");
+        if (res == CURLE_OK)
+            mvprintw(2, 2, "Done. Press any key.");
+        else
+            mvprintw(2, 2, "Error: %s. Press any key.", curl_easy_strerror(res));
     } else if (action == 1) {
         mvprintw(2, 2, "Validating...");
         refresh();
@@ -131,7 +134,10 @@ static void run_action(struct ImapServer src, struct ImapServer dst, int action)
         refresh();
         CURLcode res = imap_delete_all(target);
         clear();
-        mvprintw(2, 2, res == CURLE_OK ? "Done. Press any key." : "Error. Press any key.");
+        if (res == CURLE_OK)
+            mvprintw(2, 2, "Done. Press any key.");
+        else
+            mvprintw(2, 2, "Error: %s. Press any key.", curl_easy_strerror(res));
     }
 
     refresh();
@@ -155,7 +161,10 @@ static void run_cli(struct ImapServer src, struct ImapServer dst, const char *ac
     if (strcmp(action, "transfer") == 0) {
         printf("Transferring...\n");
         CURLcode res = transfer_mailbox(src, dst);
-        printf(res == CURLE_OK ? "Done.\n" : "Error.\n");
+        if (res == CURLE_OK)
+            printf("Done.\n");
+        else
+            fprintf(stderr, "Error: %s\n", curl_easy_strerror(res));
     } else if (strcmp(action, "validate") == 0) {
         printf("Validating...\n");
         validate_transfer(src, dst, NULL);
