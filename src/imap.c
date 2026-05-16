@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+
 static size_t write_callback(char *ptr, size_t size, size_t nmemb, void *userdata) {
     size_t realsize = nmemb;
     struct Buffer *buf = (struct Buffer *)userdata;
@@ -77,7 +78,8 @@ CURLcode imap_list_uids(struct ImapServer srv, struct Buffer *buf) {
     struct ImapRequest req = {0};
     req.custom_request = "UID SEARCH ALL";
     req.out = buf;
-    return imap_execute(srv, req, "imap_list_uids");
+    CURLcode res = imap_execute(srv, req, "imap_list_uids");
+    return res == CURLE_REMOTE_FILE_NOT_FOUND ? CURLE_OK : res;
 }
 
 CURLcode imap_fetch_message(struct ImapServer srv, int uid, struct Buffer *buf) {
@@ -97,13 +99,15 @@ CURLcode imap_fetch_envelopes(struct ImapServer srv, struct Buffer *buf) {
     struct ImapRequest req = {0};
     req.custom_request = "UID FETCH 1:* (ENVELOPE)";
     req.out = buf;
-    return imap_execute(srv, req, "imap_fetch_envelopes");
+    CURLcode res = imap_execute(srv, req, "imap_fetch_envelopes");
+    return res == CURLE_REMOTE_FILE_NOT_FOUND ? CURLE_OK : res;
 }
 
 CURLcode imap_delete_all(struct ImapServer srv) {
     struct ImapRequest req = {0};
     req.custom_request = "UID STORE 1:* +FLAGS (\\Deleted)";
     CURLcode res = imap_execute(srv, req, "imap_delete_all");
+    if (res == CURLE_REMOTE_FILE_NOT_FOUND) return CURLE_OK;
     if (res != CURLE_OK) return res;
     req.custom_request = "EXPUNGE";
     return imap_execute(srv, req, "imap_delete_all");
