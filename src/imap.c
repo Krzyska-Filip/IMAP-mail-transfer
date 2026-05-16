@@ -108,3 +108,17 @@ CURLcode imap_delete_all(struct ImapServer srv) {
     req.custom_request = "EXPUNGE";
     return imap_execute(srv, req, "imap_delete_all");
 }
+
+void imap_get_message_id(const char *line, char *out, size_t outlen) {
+    const char *close = strstr(line, ">\")");
+    if (!close) { out[0] = '\0'; return; }
+
+    const char *open = close;
+    while (open > line && *open != '<') open--;
+    if (*open != '<') { out[0] = '\0'; return; }
+
+    size_t len = (size_t)(close - open + 1);
+    if (len >= outlen) len = outlen - 1;
+    memcpy(out, open, len);
+    out[len] = '\0';
+}

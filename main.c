@@ -34,23 +34,6 @@ static CURLcode transfer_mailbox(struct ImapServer src, struct ImapServer dst) {
     return res;
 }
 
-static void extract_envelope_mid(const char *line, char *out, size_t outlen) {
-    const char *end = strstr(line, ") UID");
-    if (!end) { out[0] = '\0'; return; }
-
-    const char *close = end - 1;
-    while (close > line && *close != '"') close--;
-    if (*close != '"') { out[0] = '\0'; return; }
-
-    const char *open = close - 1;
-    while (open > line && *open != '"') open--;
-    if (*open != '"') { out[0] = '\0'; return; }
-
-    size_t len = (size_t)(close - open - 1);
-    if (len >= outlen) len = outlen - 1;
-    memcpy(out, open + 1, len);
-    out[len] = '\0';
-}
 
 static CURLcode validate_transfer(struct ImapServer src, struct ImapServer dst, WINDOW *win) {
     struct Buffer src_buf = {0}, dst_buf = {0};
@@ -75,7 +58,7 @@ static CURLcode validate_transfer(struct ImapServer src, struct ImapServer dst, 
     while (line) {
         if (strstr(line, "FETCH (ENVELOPE")) {
             char mid[256];
-            extract_envelope_mid(line, mid, sizeof(mid));
+            imap_get_message_id(line, mid, sizeof(mid));
             if (*mid && (!dst_buf.data || !strstr(dst_buf.data, mid))) {
                 if (win) mvwprintw(win, row++, 2, "MISSING: %s", mid);
                 else printf("MISSING: %s\n", mid);

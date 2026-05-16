@@ -28,3 +28,4 @@ CURLcode imap_fetch_message(struct ImapServer srv, int uid, struct Buffer *buf);
 CURLcode imap_append_message(struct ImapServer dst, struct Buffer msg);
 CURLcode imap_fetch_envelopes(struct ImapServer srv, struct Buffer *buf);
 CURLcode imap_delete_all(struct ImapServer srv);
+void     imap_get_message_id(const char *line, char *out, size_t outlen);
