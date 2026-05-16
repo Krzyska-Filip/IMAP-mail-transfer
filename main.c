@@ -182,6 +182,8 @@ int main(int argc, char *argv[]) {
 
     src.pass = opts.src_pass[0] ? opts.src_pass : NULL;
     dst.pass = opts.dst_pass[0] ? opts.dst_pass : NULL;
+    src.ssl  = opts.src_ssl;
+    dst.ssl  = opts.dst_ssl;
 
     if (parse_addr(src_addr, &src) != 0) {
         fprintf(stderr, "Invalid source address (expected user@host:port)\n");

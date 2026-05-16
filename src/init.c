@@ -58,11 +58,13 @@ int authenticate(struct ImapServer *srv, char *pass_buf, size_t pass_len) {
 int parse_opts(int argc, char *argv[], struct ParsedOpts *opts) {
     *opts = (struct ParsedOpts){0};
     int opt;
-    while ((opt = getopt(argc, argv, ":p:P:o:")) != -1) {
+    while ((opt = getopt(argc, argv, ":p:P:o:sS")) != -1) {
         switch (opt) {
             case 'p': strncpy(opts->src_pass, optarg, sizeof(opts->src_pass) - 1); break;
             case 'P': strncpy(opts->dst_pass, optarg, sizeof(opts->dst_pass) - 1); break;
             case 'o': opts->action = optarg; break;
+            case 's': opts->src_ssl = true; break;
+            case 'S': opts->dst_ssl = true; break;
             case ':':
                 fprintf(stderr, "Option -%c requires a value\n", optopt);
                 return -1;

@@ -6,6 +6,8 @@ struct ParsedOpts {
     char        src_pass[256];
     char        dst_pass[256];
     const char *action;
+    bool        src_ssl;
+    bool        dst_ssl;
 };
 
 int parse_opts(int argc, char *argv[], struct ParsedOpts *opts);

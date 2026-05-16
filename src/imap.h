@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <curl/curl.h>
 
@@ -9,6 +10,7 @@ struct ImapServer {
     char        user[128];
     const char *pass;
     const char *mailbox;
+    bool        ssl;
 };
 
 struct Buffer {

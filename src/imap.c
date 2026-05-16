@@ -36,9 +36,9 @@ static size_t discard_callback(char *, size_t, size_t nmemb, void *) {
 static CURLcode imap_execute(struct ImapServer srv, struct ImapRequest req, const char *label) {
     char url[512];
     if (req.uid > 0)
-        snprintf(url, sizeof(url), "imap://%s:%d/%s/;UID=%d", srv.host, srv.port, srv.mailbox, req.uid);
+        snprintf(url, sizeof(url), "%s://%s:%d/%s/;UID=%d", srv.ssl ? "imaps" : "imap", srv.host, srv.port, srv.mailbox, req.uid);
     else
-        snprintf(url, sizeof(url), "imap://%s:%d/%s", srv.host, srv.port, srv.mailbox);
+        snprintf(url, sizeof(url), "%s://%s:%d/%s", srv.ssl ? "imaps" : "imap", srv.host, srv.port, srv.mailbox);
 
     CURL *curl = curl_easy_init();
     if (!curl) return CURLE_FAILED_INIT;
