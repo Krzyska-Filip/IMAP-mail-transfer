@@ -22,3 +22,15 @@ services:
         -Dgreenmail.hostname=0.0.0.0
         -Dgreenmail.auth.disabled
         -Dgreenmail.users=test:password
+
+  webmail:
+    image: roundcube/roundcubemail:latest
+    ports:
+      - "8080:80"
+    environment:
+      ROUNDCUBEMAIL_DEFAULT_HOST: dest-imap
+      ROUNDCUBEMAIL_DEFAULT_PORT: 3143
+      ROUNDCUBEMAIL_SMTP_SERVER: ""
+    depends_on:
+      - source-imap
+      - dest-imap
