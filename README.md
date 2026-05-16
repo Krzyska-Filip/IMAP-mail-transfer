@@ -9,6 +9,7 @@ Copies all emails from one IMAP mailbox to another using libcurl.
 | `main.c` | TUI, CLI, and transfer logic |
 | `src/imap.c` | libcurl IMAP operations |
 | `src/init.c` | Argument parsing and authentication |
+| `src/ncurses_helper.c` | ncurses menu helpers |
 | `CMakeLists.txt` | Build configuration |
 | `docker/docker-compose.yml` | Two GreenMail IMAP servers for testing |
 | `scripts/seed_source.sh` | Seeds the source server with test emails |
