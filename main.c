@@ -6,6 +6,7 @@
 
 #include "imap.h"
 #include "init.h"
+#include "ncurses_helper.h"
 
 static CURLcode transfer_mailbox(struct ImapServer src, struct ImapServer dst) {
     struct Buffer uid_buf = {0};
@@ -78,13 +79,6 @@ static CURLcode validate_transfer(struct ImapServer src, struct ImapServer dst, 
     return CURLE_OK;
 }
 
-static void ncurses_init(void) {
-    initscr();
-    cbreak();
-    noecho();
-    keypad(stdscr, TRUE);
-    curs_set(0);
-}
 
 static void run_action(struct ImapServer src, struct ImapServer dst, int action) {
     clear();
@@ -100,31 +94,17 @@ static void run_action(struct ImapServer src, struct ImapServer dst, int action)
         validate_transfer(src, dst, stdscr);
         mvprintw(LINES - 1, 0, "Press any key.");
     } else {
-        const char *targets[] = {
-            "Source",
-            "Destination",
-        };
-        const struct ImapServer *servers[] = { &src, &dst };
-        int sel = 0, ch;
+        char src_item[300], dst_item[300];
+        snprintf(src_item, sizeof(src_item), "Source      %s@%s/%s", src.user, src.host, src.mailbox);
+        snprintf(dst_item, sizeof(dst_item), "Destination %s@%s/%s", dst.user, dst.host, dst.mailbox);
+        const char *items[] = { src_item, dst_item };
+        const char *menu_title = "Clear Mailbox";
+        const char *menu_footer = "Clear mailbox  [up/down] Navigate  [Enter] Select  [q] Cancel";
 
-        while (1) {
-            clear();
-            mvprintw(0, 2, "Clear mailbox");
-            mvprintw(LINES - 1, 0, "Clear mailbox  [up/down] Navigate  [Enter] Select  [q] Cancel");
-            for (int i = 0; i < 2; i++)
-                mvprintw(2 + i, 2, "%s %s  %s@%s/%s",
-                         i == sel ? ">" : " ", targets[i],
-                         servers[i]->user, servers[i]->host, servers[i]->mailbox);
-            refresh();
+        int sel = show_menu(menu_title, menu_footer, items, 2);
+        if (sel < 0) return;
 
-            ch = getch();
-            if (ch == 'q') return;
-            if (ch == KEY_UP && sel > 0) sel--;
-            if (ch == KEY_DOWN && sel < 1) sel++;
-            if (ch == '\n' || ch == KEY_ENTER) break;
-        }
-
-        struct ImapServer target = *servers[sel];
+        struct ImapServer target = sel == 0 ? src : dst;
 
         clear();
         mvprintw(0, 2, "Clear mailbox");
@@ -161,25 +141,12 @@ static void run_action(struct ImapServer src, struct ImapServer dst, int action)
 static void run_tui(struct ImapServer src, struct ImapServer dst) {
     ncurses_init();
 
-    const char *menu[] = {"Transfer all", "Validate transfer", "Clear mailbox"};
-    int nitems = 3;
-    int selected = 0;
-
-    int ch;
-    while (1) {
-        clear();
-        mvprintw(LINES - 1, 0, "IMAP Mail Transfer  [up/down] Navigate  [Enter] Run  [q] Quit");
-        for (int i = 0; i < nitems; i++)
-            mvprintw(2 + i, 2, "%s %s", i == selected ? ">" : " ", menu[i]);
-        refresh();
-
-        ch = getch();
-        if (ch == 'q') break;
-        if (ch == KEY_UP && selected > 0) selected--;
-        if (ch == KEY_DOWN && selected < nitems - 1) selected++;
-        if (ch == '\n' || ch == KEY_ENTER)
-            run_action(src, dst, selected);
-    }
+    const char *items[] = {"Transfer all", "Validate transfer", "Clear mailbox"};
+    const char *menu_title = "IMAP Mail Transfer";
+    const char *menu_footer = "IMAP Mail Transfer  [up/down] Navigate  [Enter] Run  [q] Quit";
+    int sel;
+    while ((sel = show_menu(menu_title, menu_footer, items, 3)) != -1)
+        run_action(src, dst, sel);
 
     endwin();
 }
@@ -202,7 +169,8 @@ int main(int argc, char *argv[]) {
     struct ImapServer src, dst;
     struct ParsedOpts opts;
 
-    if (parse_opts(argc, argv, &opts) != 0) {
+    int parse_result = parse_opts(argc, argv, &opts);
+    if (parse_result != 0) {
         return 1;
     }
 
