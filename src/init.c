@@ -7,11 +7,16 @@
 #include <unistd.h>
 
 int parse_addr(const char *addr, struct ImapServer *srv) {
-    int matched = sscanf(addr, "%127[^@]@%127[^:]:%d",
-                         srv->user, srv->host, &srv->port);
+    const char *last_at = strrchr(addr, '@');
+    if (!last_at) return -1;
 
-    if (matched < 2) return -1;
-    if (matched == 2) srv->port = 143;
+    int user_len = (int)(last_at - addr);
+    snprintf(srv->user, sizeof(srv->user), "%.*s", user_len, addr);
+
+    const char *host_part = last_at + 1;
+    int matched = sscanf(host_part, "%127[^:]:%d", srv->host, &srv->port);
+    if (matched < 1) return -1;
+    if (matched <= 1) srv->port = 143;
     return 0;
 }
 
