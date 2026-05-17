@@ -5,9 +5,9 @@
 #include <curl/curl.h>
 
 struct ImapServer {
-    char        host[128];
+    char        host[64];
     int         port;
-    char        user[128];
+    char        user[64];
     const char *pass;
     const char *mailbox;
     bool        ssl;
