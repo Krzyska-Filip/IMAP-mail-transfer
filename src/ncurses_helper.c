@@ -1,6 +1,8 @@
 #include "ncurses_helper.h"
 
 #include <ncurses.h>
+#include <stdio.h>
+#include <stdarg.h>
 
 void ncurses_init(void) {
     initscr();
@@ -57,4 +59,18 @@ int show_menu_scrollable(const char *title, const char *footer, const char *item
             return sel;
         }
     }
+}
+
+void tui_print(WINDOW *win, int y, int x, const char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    if (win) {
+        wmove(win, y, x);
+        vw_printw(win, fmt, args);
+    }
+    else {
+        vprintf(fmt, args);
+        printf("\n");
+    }
+    va_end(args);
 }
