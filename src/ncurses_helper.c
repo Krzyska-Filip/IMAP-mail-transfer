@@ -61,6 +61,17 @@ int show_menu_scrollable(const char *title, const char *footer, const char *item
     }
 }
 
+void show_list(WINDOW *win, const char *title, const char *footer, const char **items, int count) {
+    if (win) {
+        show_menu_scrollable(title, footer, items, count);
+    } else {
+        printf("%s\n", title);
+        for (int i = 0; i < count; i++) {
+            printf("  %s\n", items[i]);
+        }
+    }
+}
+
 void tui_print(WINDOW *win, int y, int x, const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
