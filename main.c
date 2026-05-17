@@ -5,6 +5,7 @@
 #include <ncurses.h>
 
 #include "imap.h"
+#include "imap_parser.h"
 #include "init.h"
 #include "ncurses_helper.h"
 
@@ -42,38 +43,88 @@ static CURLcode validate_transfer(struct ImapServer src, struct ImapServer dst, 
     CURLcode res = imap_fetch_envelopes(src, &src_buf);
     if (res != CURLE_OK) {
         free(src_buf.data);
-        free(dst_buf.data);
         return res;
     }
 
     res = imap_fetch_envelopes(dst, &dst_buf);
     if (res != CURLE_OK) {
-        free(src_buf.data);
-        free(dst_buf.data);
+        free(src_buf.data); free(dst_buf.data);
         return res;
     }
 
-    if (win) clear();
-    int row = 2, missing = 0;
-    char *line = src_buf.data ? strtok(src_buf.data, "\n") : NULL;
-    while (line) {
-        if (strstr(line, "FETCH (ENVELOPE")) {
-            char mid[256];
-            imap_get_message_id(line, mid, sizeof(mid));
-            if (*mid && (!dst_buf.data || !strstr(dst_buf.data, mid))) {
-                if (win) mvwprintw(win, row++, 2, "MISSING: %s", mid);
-                else printf("MISSING: %s\n", mid);
-                missing++;
+    struct ImapHeader *src_hdrs = malloc(8192 * sizeof(struct ImapHeader));
+    struct ImapHeader *dst_hdrs = malloc(8192 * sizeof(struct ImapHeader));
+    if (!src_hdrs || !dst_hdrs) {
+        free(src_hdrs); free(src_buf.data);
+        free(dst_hdrs); free(dst_buf.data);
+        return CURLE_OUT_OF_MEMORY;
+    }
+
+    int src_n = imap_parse_envelopes(src_buf.data ? src_buf.data : "", src_hdrs, 8192);
+    int dst_n = imap_parse_envelopes(dst_buf.data ? dst_buf.data : "", dst_hdrs, 8192);
+
+    int missing = 0;
+    char **missing_lines = malloc(src_n * sizeof(char *));
+    if (!missing_lines) {
+        free(src_hdrs); free(dst_hdrs);
+        free(src_buf.data); free(dst_buf.data);
+        return CURLE_OUT_OF_MEMORY;
+    }
+
+    int id_width = 0;
+    int *missing_idx = malloc(src_n * sizeof(int));
+    if (!missing_idx) {
+        free(src_hdrs); free(dst_hdrs);
+        free(src_buf.data); free(dst_buf.data);
+        free(missing_lines);
+        return CURLE_OUT_OF_MEMORY;
+    }
+
+    // TODO: O(n) = n^2 -> sort before by message_id
+    for (int i = 0; i < src_n; i++) {
+        int found = 0;
+        for (int j = 0; j < dst_n; j++) {
+            if (strcmp(src_hdrs[i].message_id, dst_hdrs[j].message_id) == 0) {
+                found = 1;
+                break;
             }
         }
-        line = strtok(NULL, "\n");
+        if (!found) {
+            missing_idx[missing++] = i;
+            int len = (int)strlen(src_hdrs[i].message_id);
+            if (len > id_width) id_width = len;
+        }
     }
 
-    if (missing == 0) {
-        if (win) mvwprintw(win, row, 2, "All messages present on destination.");
-        else printf("All messages present on destination.\n");
+    for (int k = 0; k < missing; k++) {
+        int i = missing_idx[k];
+        char *line = malloc(768);
+        if (line) {
+            const char *subj = src_hdrs[i].subject;
+            char subj_buf[129];
+            if (strlen(subj) > 128) {
+                snprintf(subj_buf, sizeof(subj_buf), "%.123s[...]", subj);
+                subj = subj_buf;
+            }
+            snprintf(line, 768, "%-*s  %s", id_width, src_hdrs[i].message_id, subj);
+            missing_lines[k] = line;
+        }
     }
+    free(missing_idx);
 
+    char title[64];
+    if (missing == 0)
+        snprintf(title, sizeof(title), "All %d messages present.", src_n);
+    else
+        snprintf(title, sizeof(title), "Missing %d", missing);
+
+    const char *menu_footer = "Missing messages  [up/down] Scroll  [q] Back";
+    show_list(win, title, menu_footer, (const char **)missing_lines, missing);
+
+    for (int i = 0; i < missing; i++) free(missing_lines[i]);
+    free(missing_lines);
+    free(src_hdrs);
+    free(dst_hdrs);
     free(src_buf.data);
     free(dst_buf.data);
     return CURLE_OK;
@@ -95,7 +146,6 @@ static void run_action(struct ImapServer src, struct ImapServer dst, int action)
         mvprintw(2, 2, "Validating...");
         refresh();
         validate_transfer(src, dst, stdscr);
-        mvprintw(LINES - 1, 0, "Press any key.");
     } else {
         char src_item[300], dst_item[300];
         snprintf(src_item, sizeof(src_item), "Source      %s@%s/%s", src.user, src.host, src.mailbox);
