@@ -3,6 +3,7 @@
 #include <ncurses.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include <string.h>
 
 void ncurses_init(void) {
     initscr();
@@ -85,6 +86,21 @@ void show_list(WINDOW *win, const char *title, const char *footer, const char **
         printf("%s\n", title);
         for (int i = 0; i < count; i++) {
             printf("  %s\n", items[i]);
+        }
+    }
+}
+
+void tui_getstr(WINDOW *win, int y, int x, char *buf, int maxlen) {
+    if (win) {
+        echo();
+        curs_set(1);
+        mvgetnstr(y, x, buf, maxlen);
+        noecho();
+        curs_set(0);
+    } else {
+        if (fgets(buf, maxlen + 1, stdin)) {
+            int len = strlen(buf);
+            if (len > 0 && buf[len - 1] == '\n') buf[len - 1] = '\0';
         }
     }
 }

@@ -156,12 +156,8 @@ void action_clear(struct ImapServer src, struct ImapServer dst, WINDOW *win) {
     mvprintw(LINES - 1, 0, "Clear mailbox  [confirm] Execute  [q/Enter] Cancel");
     refresh();
 
-    echo();
-    curs_set(1);
     char input[16];
-    mvgetnstr(4, 29, input, (int)sizeof(input) - 1);
-    noecho();
-    curs_set(0);
+    tui_getstr(win, 4, 29, input, (int)sizeof(input) - 1);
 
     if (strcmp(input, "confirm") != 0) {
         show_message(win, 2, 2, "Cancelled.");
