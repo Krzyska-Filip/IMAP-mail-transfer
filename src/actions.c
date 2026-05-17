@@ -52,7 +52,7 @@ void action_transfer(struct ImapServer src, struct ImapServer dst, WINDOW *win) 
 void action_validate(struct ImapServer src, struct ImapServer dst, WINDOW *win) {
     tui_print(win, 2, 2, "Validating...");
 
-    struct Buffer src_buf, dst_buf;
+    struct Buffer src_buf = {0}, dst_buf = {0};
 
     CURLcode res = imap_fetch_envelopes(src, &src_buf);
     if (res != CURLE_OK) {
@@ -168,7 +168,7 @@ void action_clear(struct ImapServer src, struct ImapServer dst, WINDOW *win) {
         return;
     }
 
-    mvprintw(6, 2, "Clearing..."); refresh();
+    tui_print(stdscr, 6, 2, "Clearing...");
     CURLcode res = imap_delete_all(target);
     clear();
 
