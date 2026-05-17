@@ -108,13 +108,15 @@ void action_validate(struct ImapServer src, struct ImapServer dst, WINDOW *win) 
         int i = missing_idx[k];
         char *line = malloc(768);
         if (line) {
-            const char *subj = src_hdrs[i].subject;
             char subj_buf[129];
-            if (strlen(subj) > 128) {
-                snprintf(subj_buf, sizeof(subj_buf), "%.123s[...]", subj);
-                subj = subj_buf;
-            }
-            snprintf(line, 768, "%-*s  %s", id_width, src_hdrs[i].message_id, subj);
+            if (strlen(src_hdrs[i].subject) > 128)
+                snprintf(subj_buf, sizeof(subj_buf), "%.123s[...]", src_hdrs[i].subject);
+            else
+                snprintf(subj_buf, sizeof(subj_buf), "%.128s", src_hdrs[i].subject);
+
+            int n = snprintf(line, 768, "%s", src_hdrs[i].message_id);
+            if (n < id_width) { memset(line + n, ' ', id_width - n); n = id_width; }
+            snprintf(line + n, 768 - n, "  %s", subj_buf);
             missing_lines[k] = line;
         }
     }
