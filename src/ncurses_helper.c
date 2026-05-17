@@ -61,6 +61,23 @@ int show_menu_scrollable(const char *title, const char *footer, const char *item
     }
 }
 
+void show_message(WINDOW *win, int y, int x, const char *fmt, ...) {
+    char buf[512];
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(buf, sizeof(buf), fmt, args);
+    va_end(args);
+
+    if (win) {
+        mvprintw(y, x, "%s [Press any key.]", buf);
+        refresh();
+        getch();
+    } else {
+        printf("%s\n", buf);
+    }
+    va_end(args);
+}
+
 void show_list(WINDOW *win, const char *title, const char *footer, const char **items, int count) {
     if (win) {
         show_menu_scrollable(title, footer, items, count);
@@ -78,6 +95,7 @@ void tui_print(WINDOW *win, int y, int x, const char *fmt, ...) {
     if (win) {
         wmove(win, y, x);
         vw_printw(win, fmt, args);
+        refresh();
     }
     else {
         vprintf(fmt, args);
