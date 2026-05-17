@@ -38,6 +38,17 @@ static CURLcode transfer_mailbox(struct ImapServer src, struct ImapServer dst) {
 }
 
 void action_transfer(struct ImapServer src, struct ImapServer dst, WINDOW *win) {
+    if (win) {
+        char fwd[300], rev[300];
+        snprintf(fwd, sizeof(fwd), "%s@%s/%s -> %s@%s/%s", src.user, src.host, src.mailbox, dst.user, dst.host, dst.mailbox);
+        snprintf(rev, sizeof(rev), "%s@%s/%s <- %s@%s/%s", src.user, src.host, src.mailbox, dst.user, dst.host, dst.mailbox);
+        const char *items[] = { fwd, rev };
+        int sel = show_menu("Transfer", "Transfer  [up/down] Navigate  [Enter] Select  [q] Cancel", items, 2);
+        if (sel < 0) return;
+        if (sel == 1) { struct ImapServer tmp = src; src = dst; dst = tmp; }
+        clear();
+    }
+
     tui_print(win, 2, 2, "Transfering...");
 
     CURLcode res = transfer_mailbox(src, dst);
@@ -50,6 +61,17 @@ void action_transfer(struct ImapServer src, struct ImapServer dst, WINDOW *win) 
 }
 
 void action_validate(struct ImapServer src, struct ImapServer dst, WINDOW *win) {
+    if (win) {
+        char fwd[300], rev[300];
+        snprintf(fwd, sizeof(fwd), "%s@%s/%s -> %s@%s/%s", src.user, src.host, src.mailbox, dst.user, dst.host, dst.mailbox);
+        snprintf(rev, sizeof(rev), "%s@%s/%s <- %s@%s/%s", src.user, src.host, src.mailbox, dst.user, dst.host, dst.mailbox);
+        const char *items[] = { fwd, rev };
+        int sel = show_menu("Validate", "Validate  [up/down] Navigate  [Enter] Select  [q] Cancel", items, 2);
+        if (sel < 0) return;
+        if (sel == 1) { struct ImapServer tmp = src; src = dst; dst = tmp; }
+        clear();
+    }
+    
     tui_print(win, 2, 2, "Validating...");
 
     struct Buffer src_buf = {0}, dst_buf = {0};
@@ -143,10 +165,9 @@ void action_clear(struct ImapServer src, struct ImapServer dst, WINDOW *win) {
     snprintf(dst_item, sizeof(dst_item), "Destination %s@%s/%s", dst.user, dst.host, dst.mailbox);
     const char *items[] = { src_item, dst_item };
 
-    int sel = show_menu(
-        "Clear Mailbox",
-        "Clear mailbox  [up/down] Navigate  [Enter] Select  [q] Cancel",
-        items, 2);
+    char *menu_header = "Clear Mailbox";
+    char *menu_footer = "Clear mailbox  [up/down] Navigate  [Enter] Select  [q] Cancel";
+    int sel = show_menu(menu_header, menu_footer, items, 2);
     if (sel < 0) return;
 
     struct ImapServer target = sel == 0 ? src : dst;
