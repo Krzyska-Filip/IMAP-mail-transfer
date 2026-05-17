@@ -11,7 +11,7 @@ int imap_tokenize(const char *src, Token *tokens, int max) {
             pos++;
 
         char c = src[pos];
-        if (!c) { tokens[n++].type = TOK_EOF; break; }
+        if (c == '\0') { tokens[n++].type = TOK_EOF; break; }
 
         if (c == '(') { tokens[n++].type = TOK_LPAREN; pos++; continue; }
         if (c == ')') { tokens[n++].type = TOK_RPAREN; pos++; continue; }
