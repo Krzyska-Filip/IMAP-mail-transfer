@@ -134,17 +134,15 @@ static CURLcode validate_transfer(struct ImapServer src, struct ImapServer dst, 
 static void run_action(struct ImapServer src, struct ImapServer dst, int action) {
     clear();
     if (action == 0) {
-        mvprintw(2, 2, "Transferring...");
-        refresh();
+        tui_print(stdscr, 2, 2, "Transfering...");
         CURLcode res = transfer_mailbox(src, dst);
         clear();
         if (res == CURLE_OK)
-            mvprintw(2, 2, "Done. Press any key.");
+            show_message(stdscr, 2, 2, "Done.");
         else
-            mvprintw(2, 2, "Error: %s. Press any key.", curl_easy_strerror(res));
+            show_message(stdscr, 2, 2, "Error: %s", curl_easy_strerror(res));
     } else if (action == 1) {
-        mvprintw(2, 2, "Validating...");
-        refresh();
+        tui_print(stdscr, 2, 2, "Validating...");
         validate_transfer(src, dst, stdscr);
     } else {
         char src_item[300], dst_item[300];
@@ -174,24 +172,22 @@ static void run_action(struct ImapServer src, struct ImapServer dst, int action)
         curs_set(0);
 
         if (strcmp(input, "confirm") != 0) {
-            mvprintw(6, 2, "Cancelled. Press any key.");
-            refresh();
-            getch();
+            show_message(stdscr, 2, 2, "Cancelled");
             return;
         }
 
-        mvprintw(6, 2, "Clearing...");
-        refresh();
+        tui_print(stdscr, 6, 2, "Clearing...");
         CURLcode res = imap_delete_all(target);
+
         clear();
+
         if (res == CURLE_OK)
-            mvprintw(2, 2, "Done. Press any key.");
+            show_message(stdscr, 2, 2, "Done", curl_easy_strerror(res));
         else
-            mvprintw(2, 2, "Error: %s. Press any key.", curl_easy_strerror(res));
+            show_message(stdscr, 2, 2, "Error: %s", curl_easy_strerror(res));
     }
 
     refresh();
-    getch();
 }
 
 static void run_tui(struct ImapServer src, struct ImapServer dst) {
