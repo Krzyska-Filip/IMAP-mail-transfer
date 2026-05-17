@@ -1,15 +1,17 @@
 # imap-mail-transfer
 
-Copies all emails from one IMAP mailbox to another using libcurl.
+Transfers, validates, and manages emails between two IMAP mailboxes using libcurl. Supports an interactive TUI and a non-interactive CLI mode.
 
 ## Files
 
 | File | Description |
 |------|-------------|
-| `main.c` | TUI, CLI, and transfer logic |
-| `src/imap.c` | libcurl IMAP operations |
+| `main.c` | Entry point, TUI/CLI dispatch |
+| `src/imap.c` | libcurl IMAP operations (fetch, append, delete) |
+| `src/imap_parser.c` | IMAP ENVELOPE parser |
 | `src/init.c` | Argument parsing and authentication |
-| `src/ncurses_helper.c` | ncurses menu helpers |
+| `src/ncurses_helper.c` | ncurses UI helpers (menus, lists, input) |
+| `src/actions.c` | Transfer, validate, and clear mailbox actions |
 | `CMakeLists.txt` | Build configuration |
 | `docker/docker-compose.yml` | Two GreenMail IMAP servers for testing |
 | `scripts/seed_source.sh` | Seeds the source server with test emails |
