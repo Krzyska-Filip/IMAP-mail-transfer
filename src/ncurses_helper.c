@@ -90,6 +90,23 @@ void show_list(WINDOW *win, const char *title, const char *footer, const char **
     }
 }
 
+void progress_bar(WINDOW *win, int y, int x, int items, int total_items) {
+    int bars = items * 20 / total_items;
+    int pct  = items * 100 / total_items;
+
+    if (win) {
+        mvwprintw(win, y, x, "[");
+        for (int i = 0; i < 20; i++) waddch(win, i < bars ? '#' : ' ');
+        mvwprintw(win, y, x + 21, "] %3d%%  %d/%d", pct, items, total_items);
+        wrefresh(win);
+    } else {
+        printf("\r[");
+        for (int i = 0; i < 20; i++) putchar(i < bars ? '#' : ' ');
+        printf("] %3d%%  %d/%d", pct, items, total_items);
+        fflush(stdout);
+    }
+}
+
 void tui_getstr(WINDOW *win, int y, int x, char *buf, int maxlen) {
     if (win) {
         echo();
