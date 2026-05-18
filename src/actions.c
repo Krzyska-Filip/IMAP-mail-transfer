@@ -10,7 +10,8 @@
 #include "imap_parser.h"
 #include "ncurses_helper.h"
 
-static CURLcode transfer_mailbox(struct ImapServer src, struct ImapServer dst) {
+static CURLcode transfer_mailbox(struct ImapServer src, struct ImapServer dst,
+                                 void (*on_progress)(int, int, void *), void *ctx) {
     struct Buffer uid_buf = {0};
     CURLcode res = imap_list_uids(src, &uid_buf);
     if (res != CURLE_OK) return res;
@@ -19,6 +20,15 @@ static CURLcode transfer_mailbox(struct ImapServer src, struct ImapServer dst) {
     if (!p) { free(uid_buf.data); return CURLE_OK; }
     p += strlen("SEARCH");
 
+    int total = 0;
+    for (char *q = p; *q;) {
+        char *end;
+        strtol(q, &end, 10);
+        if (end == q) break;
+        total++; q = end;
+    }
+
+    int current = 0;
     while (*p) {
         char *end;
         long uid = strtol(p, &end, 10);
@@ -30,11 +40,16 @@ static CURLcode transfer_mailbox(struct ImapServer src, struct ImapServer dst) {
         if (res == CURLE_OK)
             res = imap_append_message(dst, msg);
         free(msg.data);
+        if (on_progress) on_progress(++current, total, ctx);
         if (res != CURLE_OK) break;
     }
 
     free(uid_buf.data);
     return res;
+}
+
+static void on_transfer_progress(int current, int total, void *ctx) {
+    progress_bar((WINDOW *)ctx, 4, 2, current, total);
 }
 
 void action_transfer(struct ImapServer src, struct ImapServer dst, WINDOW *win) {
@@ -51,8 +66,11 @@ void action_transfer(struct ImapServer src, struct ImapServer dst, WINDOW *win) 
 
     tui_print(win, 2, 2, "Transfering...");
 
-    CURLcode res = transfer_mailbox(src, dst);
-    if (win) clear();
+    CURLcode res = transfer_mailbox(src, dst, on_transfer_progress, win);
+    if (win)
+        clear();
+    else
+        printf("\n");
 
     if (res == CURLE_OK)
         show_message(win, 2, 2, "Done.");
