@@ -4,6 +4,7 @@ set -e
 
 HOST="${1:-localhost}"
 PORT="${2:-1143}"
+COUNT="${3:-3}"
 USER="test"
 PASS="password"
 TMP=$(mktemp)
@@ -24,6 +25,6 @@ send_mail() {
 
 trap 'rm -f "$TMP"' EXIT
 
-send_mail "Test email 1" "This is the first test email."
-send_mail "Test email 2" "This is the second test email."
-send_mail "Test email 3" "This is the third test email."
+for i in $(seq 1 "$COUNT"); do
+    send_mail "Test email $i" "This is test email number $i."
+done
