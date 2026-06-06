@@ -177,6 +177,78 @@ void action_validate(struct ImapServer src, struct ImapServer dst, WINDOW *win) 
     free(src_buf.data); free(dst_buf.data);
 }
 
+void show_messages(struct ImapServer src, struct ImapServer dst, WINDOW *win) {
+    if (win) {
+        char fwd[300], rev[300];
+        snprintf(fwd, sizeof(fwd), "%s@%s/%s", src.user, src.host, src.mailbox);
+        snprintf(rev, sizeof(rev), "%s@%s/%s", dst.user, dst.host, dst.mailbox);
+        const char *items[] = { fwd, rev };
+        int sel = show_menu("Show all messages", "Showing Messages  [up/down] Navigate  [Enter] Select  [q] Cancel", items, 2);
+        if (sel < 0) return;
+        if (sel == 1) { struct ImapServer tmp = src; src = dst; dst = tmp; }
+        clear();
+    }
+
+    tui_print(win, 2, 2, "Fetching messages...");
+
+    struct Buffer src_buf = {0};
+
+    CURLcode res = imap_fetch_envelopes(src, &src_buf);
+    if (res != CURLE_OK) {
+        free(src_buf.data);
+        return;
+    }
+
+    struct ImapHeader *src_hdrs = malloc(8192 * sizeof(struct ImapHeader));
+    if (!src_hdrs) {
+        free(src_hdrs);
+        free(src_buf.data);
+        return;
+    }
+
+    int src_n = imap_parse_envelopes(src_buf.data ? src_buf.data : "", src_hdrs, 8192);
+
+    int id_width = 0;
+    for (int i = 0; i < src_n; i++) {
+        int len = (int)strlen(src_hdrs[i].message_id);
+        if (len > id_width) id_width = len;
+    }
+    if (id_width > 255) id_width = 255;
+
+    char **lines = malloc(src_n * sizeof(char *));
+    if (!lines) {
+        free(src_hdrs);
+        free(src_buf.data);
+        return;
+    }
+
+    for (int k = 0; k < src_n; k++) {
+        char *line = malloc(768);
+        if (line) {
+            char subj_buf[129];
+            if (strlen(src_hdrs[k].subject) > 128)
+                snprintf(subj_buf, sizeof(subj_buf), "%.123s[...]", src_hdrs[k].subject);
+            else
+                snprintf(subj_buf, sizeof(subj_buf), "%.128s", src_hdrs[k].subject);
+
+            int n = snprintf(line, 768, "%s", src_hdrs[k].message_id);
+            if (n < id_width) { memset(line + n, ' ', id_width - n); n = id_width; }
+            snprintf(line + n, 768 - n, "  %s", subj_buf);
+        }
+        lines[k] = line;
+    }
+
+    char title[64];
+    snprintf(title, sizeof(title), "All messages (%d)", src_n);
+    const char* menu_footer = "Showing messages  [up/down] Scroll  [q] Back";
+    show_list(win, title, menu_footer, (const char **)lines, src_n);
+
+    for (int i = 0; i < src_n; i++) free(lines[i]);
+    free(lines);
+    free(src_hdrs);
+    free(src_buf.data);
+}
+
 void action_clear(struct ImapServer src, struct ImapServer dst, WINDOW *win) {
     char src_item[300], dst_item[300];
     snprintf(src_item, sizeof(src_item), "Source      %s@%s/%s", src.user, src.host, src.mailbox);
@@ -219,12 +291,15 @@ void run_action(struct ImapServer src, struct ImapServer dst, int action) {
     clear();
     switch (action) {
         case 0:
-            action_transfer(src, dst, stdscr);
+            show_messages(src, dst, stdscr);
             break;
         case 1:
-            action_validate(src, dst, stdscr);
+            action_transfer(src, dst, stdscr);
             break;
         case 2:
+            action_validate(src, dst, stdscr);
+            break;
+        case 3:
             action_clear(src, dst, stdscr);
             break;
         default:

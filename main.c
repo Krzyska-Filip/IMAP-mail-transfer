@@ -11,11 +11,11 @@
 static void run_tui(struct ImapServer src, struct ImapServer dst) {
     ncurses_init();
 
-    const char *items[] = {"Transfer all", "Validate transfer", "Clear mailbox"};
+    const char *items[] = {"Show messages", "Transfer all", "Validate transfer", "Clear mailbox"};
     const char *menu_title = "IMAP Mail Transfer";
     const char *menu_footer = "IMAP Mail Transfer  [up/down] Navigate  [Enter] Run  [q] Quit";
     int sel;
-    while ((sel = show_menu(menu_title, menu_footer, items, 3)) != -1)
+    while ((sel = show_menu(menu_title, menu_footer, items, 4)) != -1)
         run_action(src, dst, sel);
 
     endwin();
